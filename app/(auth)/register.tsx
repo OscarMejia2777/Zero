@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   Linking,
   Platform,
   Pressable,
@@ -11,6 +12,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
+import { registerUser, saveSession } from "../../db";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -20,16 +23,56 @@ export default function RegisterScreen() {
   const [pass, setPass] = useState("");
   const [confirm, setConfirm] = useState("");
   const [securePass, setSecurePass] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
+  const { signIn } = useAuth();
 
   const canSubmit = useMemo(() => {
     return (
-      fullName.trim().length > 0 &&
-      email.trim().length > 0 &&
-      pass.length >= 1 &&
-      confirm.length >= 1 &&
+      fullName.trim().length > 2 &&
+      email.trim().includes("@") &&
+      pass.length >= 6 &&
+      confirm.length >= 6 &&
       pass === confirm
     );
   }, [fullName, email, pass, confirm]);
+
+  const handleRegister = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+
+    try {
+      setRegisterError(null);
+      console.log("[Register] Starting registration for:", email);
+      const user = await registerUser(email, pass, fullName);
+      console.log("[Register] User result:", user ? "Success" : "Failed");
+
+      if (user) {
+        console.log("[Register] Saving session...");
+        await saveSession(user.id);
+        console.log("[Register] Session saved. Calling signIn...");
+        signIn(user);
+        // AuthProvider handles navigation
+      } else {
+        setRegisterError(
+          "Could not create account. Email might be already in use."
+        );
+        Alert.alert(
+          "Error",
+          "Could not create account. Email might be already in use."
+        );
+      }
+    } catch (err: any) {
+      console.error("[Register] Error:", err);
+      setRegisterError(
+        err.message || "Something went wrong. Please try again."
+      );
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -146,16 +189,33 @@ export default function RegisterScreen() {
         <View style={{ height: 28 }} />
 
         <Pressable
-          disabled={!canSubmit}
-          onPress={() => {}}
+          disabled={!canSubmit || loading}
+          onPress={handleRegister}
           style={({ pressed }) => [
             styles.primaryBtn,
-            !canSubmit && { opacity: 0.55 },
-            pressed && canSubmit && { transform: [{ scale: 0.99 }] },
+            (!canSubmit || loading) && { opacity: 0.55 },
+            pressed &&
+              canSubmit &&
+              !loading && { transform: [{ scale: 0.99 }] },
           ]}
         >
-          <Text style={styles.primaryText}>Create Account</Text>
+          <Text style={styles.primaryText}>
+            {loading ? "Creating Account..." : "Create Account"}
+          </Text>
         </Pressable>
+
+        {registerError && (
+          <Text
+            style={{
+              color: "#FF4D4D",
+              textAlign: "center",
+              marginTop: 12,
+              fontWeight: "600",
+            }}
+          >
+            {registerError}
+          </Text>
+        )}
 
         <View style={{ height: 18 }} />
 

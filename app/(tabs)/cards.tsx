@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import {
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -10,59 +11,56 @@ import {
   Text,
   View,
 } from "react-native";
-
-type CardItem = {
-  id: string;
-  tier: string;
-  name: string;
-  last4: string;
-  owner?: string;
-  exp?: string;
-  limit: string;
-  accent: "green" | "purple" | "blue";
-  brandRightIcon?: React.ComponentProps<typeof Ionicons>["name"];
-  chip?: boolean;
-  activeDot?: boolean;
-  subline?: string; // e.g. ACTIVE
-};
-
-const CARDS: CardItem[] = [
-  {
-    id: "1",
-    tier: "PREMIUM CREDIT",
-    name: "Carbon Prime",
-    last4: "8824",
-    owner: "ALEXANDER VAUGHN",
-    limit: "$25,000",
-    accent: "green",
-    brandRightIcon: "moon",
-    chip: true,
-  },
-  {
-    id: "2",
-    tier: "EXECUTIVE",
-    name: "Obsidian Card",
-    last4: "5102",
-    exp: "09 / 28",
-    limit: "$12,500",
-    accent: "purple",
-    brandRightIcon: "radio-button-on",
-  },
-  {
-    id: "3",
-    tier: "EVERYDAY",
-    name: "Slate Digital",
-    last4: "9901",
-    limit: "$8,000",
-    accent: "blue",
-    activeDot: true,
-    subline: "ACTIVE",
-    brandRightIcon: "calculator",
-  },
-];
+import { useAuth } from "../../context/AuthContext";
+import { CARD_COLORS, deleteCard, getAllCards, type Card } from "../../db";
 
 export default function CardsScreen() {
   const router = useRouter();
+  const [cards, setCards] = React.useState<Card[]>([]);
+
+  const { user } = useAuth();
+
+  const fetchCards = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const fetched = await getAllCards(user.id);
+      setCards(fetched);
+    } catch (error) {
+      console.error("Error fetching cards:", error);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchCards();
+    }, [fetchCards])
+  );
+
+  const handleDelete = (id: number) => {
+    const performDelete = async () => {
+      try {
+        await deleteCard(id);
+        await fetchCards();
+      } catch (error) {
+        console.error("Error deleting card:", error);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (confirm("¿Eliminar esta tarjeta? Se borrarán también sus compras.")) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        "Eliminar Tarjeta",
+        "¿Estás seguro? Se borrarán todas las compras vinculadas.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Eliminar", style: "destructive", onPress: performDelete },
+        ]
+      );
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -73,8 +71,8 @@ export default function CardsScreen() {
       />
 
       <FlatList
-        data={CARDS}
-        keyExtractor={(i) => i.id}
+        data={cards}
+        keyExtractor={(i) => i.id.toString()}
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={() => <View style={{ height: 18 }} />}
         ListHeaderComponent={
@@ -94,28 +92,33 @@ export default function CardsScreen() {
               </Pressable>
 
               <Text style={styles.title}>My Cards</Text>
-
-              <Pressable
-                onPress={() => router.push("/(tabs)/cards/new")}
-                style={({ pressed }) => [
-                  styles.addBtn,
-                  pressed && { opacity: 0.9 },
-                ]}
-              >
-                <Ionicons
-                  name="add"
-                  size={18}
-                  color="rgba(64, 255, 197, 0.95)"
-                />
-                <Text style={styles.addText}>ADD</Text>
-              </Pressable>
+              <View style={{ width: 44 }} />
             </View>
 
             <View style={styles.divider} />
             <View style={{ height: 18 }} />
           </>
         }
-        renderItem={({ item }) => <CardVisual item={item} />}
+        renderItem={({ item }) => (
+          <CardVisual
+            item={item}
+            onDelete={() => handleDelete(item.id)}
+            onPress={() =>
+              router.push({
+                pathname: "/cards/new",
+                params: { id: item.id },
+              })
+            }
+          />
+        )}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No has agregado tarjetas aún.</Text>
+            <Pressable onPress={() => router.push("/(tabs)/cards/new")}>
+              <Text style={styles.emptyLink}>Agregar mi primera tarjeta</Text>
+            </Pressable>
+          </View>
+        }
         ListFooterComponent={
           <>
             <View style={{ height: 18 }} />
@@ -128,11 +131,26 @@ export default function CardsScreen() {
   );
 }
 
-function CardVisual({ item }: { item: CardItem }) {
-  const accent = getAccent(item.accent);
+function CardVisual({
+  item,
+  onDelete,
+  onPress,
+}: {
+  item: Card;
+  onDelete: () => void;
+  onPress: () => void;
+}) {
+  const accent = getAccent(item.color);
 
   return (
-    <View style={[styles.cardWrap, { shadowColor: accent.glow }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.cardWrap,
+        { shadowColor: accent.glow },
+        pressed && { transform: [{ scale: 0.98 }] },
+      ]}
+    >
       {/* glow */}
       <View style={[styles.cardGlow, { backgroundColor: accent.glowSoft }]} />
 
@@ -153,63 +171,56 @@ function CardVisual({ item }: { item: CardItem }) {
         />
 
         <View style={styles.cardTopRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.cardTier, { color: accent.label }]}>
-              {item.tier}
+              {item.bank_name.toUpperCase()}
             </Text>
-            <Text style={styles.cardName}>{item.name}</Text>
+            <Text style={styles.cardName} numberOfLines={1}>
+              {item.name}
+            </Text>
           </View>
 
-          {item.brandRightIcon ? (
-            <View style={styles.brandIcon}>
-              <Ionicons
-                name={item.brandRightIcon}
-                size={18}
-                color="rgba(255,255,255,0.65)"
-              />
-            </View>
-          ) : (
-            <View style={styles.brandIcon} />
-          )}
+          <Pressable onPress={onDelete} style={styles.deleteBtn}>
+            <Ionicons
+              name="trash-outline"
+              size={20}
+              color="rgba(255,100,100,0.6)"
+            />
+          </Pressable>
         </View>
 
         <View style={styles.cardMidRow}>
-          {item.chip ? (
-            <View style={styles.chip} />
-          ) : (
-            <View style={{ width: 44, height: 34 }} />
-          )}
+          <View style={styles.chip} />
 
           <View style={styles.numberBlock}>
             <Text style={styles.dots}>• • • •</Text>
             <Text style={styles.last4}>{item.last4}</Text>
           </View>
 
-          {!!item.owner && <Text style={styles.owner}>{item.owner}</Text>}
-          {!!item.exp && <Text style={styles.exp}>{item.exp}</Text>}
-
-          {item.activeDot || item.subline ? (
-            <View style={styles.activeRow}>
-              {item.activeDot ? <View style={styles.activeDot} /> : null}
-              {item.subline ? (
-                <Text style={styles.activeText}>{item.subline}</Text>
-              ) : null}
-            </View>
-          ) : null}
+          <View style={styles.activeRow}>
+            <View
+              style={[styles.activeDot, { backgroundColor: accent.value }]}
+            />
+            <Text style={styles.activeText}>
+              CIERRE: DÍA {item.cut_off_day}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.cardBottomRow}>
-          <View style={{ flex: 1 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.limitLabel}>PAGO: DÍA {item.payment_day}</Text>
+          </View>
 
           <View style={{ alignItems: "flex-end" }}>
             <Text style={styles.limitLabel}>CREDIT LIMIT</Text>
             <Text style={[styles.limitValue, { color: accent.value }]}>
-              {item.limit}
+              ${item.credit_limit.toLocaleString()}
             </Text>
           </View>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -241,37 +252,19 @@ function InfoBox() {
   );
 }
 
-function getAccent(kind: CardItem["accent"]) {
-  if (kind === "green") {
-    return {
-      label: "rgba(64,255,197,0.65)",
-      value: "rgba(64,255,197,0.95)",
-      border: "rgba(64,255,197,0.18)",
-      glow: "rgba(64,255,197,0.55)",
-      glowSoft: "rgba(64,255,197,0.10)",
-      overlayA: "rgba(64,255,197,0.16)",
-      overlayB: "rgba(64,255,197,0.06)",
-    };
-  }
-  if (kind === "purple") {
-    return {
-      label: "rgba(200,120,255,0.55)",
-      value: "rgba(200,120,255,0.95)",
-      border: "rgba(200,120,255,0.16)",
-      glow: "rgba(200,120,255,0.45)",
-      glowSoft: "rgba(200,120,255,0.10)",
-      overlayA: "rgba(200,120,255,0.12)",
-      overlayB: "rgba(200,120,255,0.06)",
-    };
-  }
+function getAccent(colorName: string) {
+  const config =
+    CARD_COLORS.find((c) => c.value === colorName) || CARD_COLORS[2]; // Default blue
+  const hex = config.hex;
+
   return {
-    label: "rgba(80,160,255,0.55)",
-    value: "rgba(80,160,255,0.95)",
-    border: "rgba(80,160,255,0.16)",
-    glow: "rgba(80,160,255,0.45)",
-    glowSoft: "rgba(80,160,255,0.10)",
-    overlayA: "rgba(80,160,255,0.12)",
-    overlayB: "rgba(80,160,255,0.06)",
+    label: hex + "A0",
+    value: hex,
+    border: hex + "30",
+    glow: hex + "80",
+    glowSoft: hex + "1A",
+    overlayA: hex + "29",
+    overlayB: hex + "0F",
   };
 }
 
@@ -308,23 +301,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  addBtn: {
-    height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(64,255,197,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(64,255,197,0.22)",
-  },
-  addText: {
-    color: "rgba(64,255,197,0.92)",
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-
   divider: {
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -338,7 +314,10 @@ const styles = StyleSheet.create({
   },
   cardGlow: {
     position: "absolute",
-    inset: -6,
+    left: -6,
+    right: -6,
+    top: -6,
+    bottom: -6,
     borderRadius: 34,
   },
 
@@ -348,7 +327,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     padding: 18,
     borderWidth: 1,
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: "rgba(0,0,0,0)",
   },
 
   cardTopRow: {
@@ -367,15 +346,16 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "900",
   },
-  brandIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,100,100,0.08)",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,100,100,0.15)",
   },
 
   cardMidRow: {
@@ -412,19 +392,6 @@ const styles = StyleSheet.create({
     letterSpacing: 6,
   },
 
-  owner: {
-    marginTop: 6,
-    color: "rgba(255,255,255,0.70)",
-    fontWeight: "900",
-    letterSpacing: 1.2,
-  },
-  exp: {
-    marginTop: 6,
-    color: "rgba(255,255,255,0.78)",
-    fontWeight: "900",
-    letterSpacing: 2,
-  },
-
   activeRow: {
     marginTop: 8,
     flexDirection: "row",
@@ -435,12 +402,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 99,
-    backgroundColor: "#5DB6FF",
   },
   activeText: {
     color: "rgba(255,255,255,0.75)",
     fontWeight: "900",
     letterSpacing: 2,
+    fontSize: 10,
   },
 
   cardBottomRow: {
@@ -459,6 +426,22 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 18,
     fontWeight: "900",
+  },
+
+  emptyContainer: {
+    marginTop: 60,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptyLink: {
+    marginTop: 12,
+    color: "#40FFC5",
+    fontSize: 16,
+    fontWeight: "800",
   },
 
   infoBox: {

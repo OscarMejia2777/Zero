@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,6 +11,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
+import { saveSession, validateUser } from "../../db";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -17,13 +20,37 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const { signIn } = useAuth();
 
   const canSubmit = useMemo(() => {
-    return email.trim().length > 0 && password.length > 0;
+    return email.trim().includes("@") && password.length >= 6;
   }, [email, password]);
 
+  const handleSignIn = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+
+    try {
+      const user = await validateUser(email, password);
+      if (user) {
+        await saveSession(user.id);
+        signIn(user);
+        // AuthProvider will handle navigation
+      } else {
+        Alert.alert("Error", "Invalid email or password");
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <View style={styles.root}>
+    <View className="overflow-auto" style={styles.root}>
       <LinearGradient
         colors={["#07090D", "#06080B", "#05070A"]}
         locations={[0, 0.5, 1]}
@@ -122,15 +149,19 @@ export default function LoginScreen() {
         <View style={{ height: 22 }} />
 
         <Pressable
-          onPress={() => {}}
-          disabled={!canSubmit}
+          onPress={handleSignIn}
+          disabled={!canSubmit || loading}
           style={({ pressed }) => [
             styles.signInBtn,
-            !canSubmit && { opacity: 0.55 },
-            pressed && canSubmit && { transform: [{ scale: 0.99 }] },
+            (!canSubmit || loading) && { opacity: 0.55 },
+            pressed &&
+              canSubmit &&
+              !loading && { transform: [{ scale: 0.99 }] },
           ]}
         >
-          <Text style={styles.signInText}>Sign In</Text>
+          <Text style={styles.signInText}>
+            {loading ? "Signing in..." : "Sign In"}
+          </Text>
         </Pressable>
 
         {/* Secure access */}
