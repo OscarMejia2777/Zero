@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   },
 
   summaryCard: {
-    height: 170,
+    minHeight: 180,
     borderRadius: 26,
     overflow: "hidden",
     padding: 18,

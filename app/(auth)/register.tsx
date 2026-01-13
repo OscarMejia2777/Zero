@@ -4,9 +4,11 @@ import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -82,169 +84,181 @@ export default function RegisterScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Back button floating */}
-      <View style={styles.topArea}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backCircle}
-          hitSlop={12}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Ionicons
-            name="chevron-back"
-            size={22}
-            color="rgba(255,255,255,0.7)"
-          />
-        </Pressable>
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>
-          Start tracking your 0% installments and{"\n"}save on fees today.
-        </Text>
-
-        <View style={{ height: 26 }} />
-
-        <Text style={styles.label}>Full Name</Text>
-        <InputPill
-          value={fullName}
-          onChangeText={setFullName}
-          placeholder="John Doe"
-          icon={
-            <Ionicons
-              name="person-outline"
-              size={18}
-              color="rgba(255,255,255,0.35)"
-            />
-          }
-        />
-
-        <View style={{ height: 18 }} />
-
-        <Text style={styles.label}>Email Address</Text>
-        <InputPill
-          value={email}
-          onChangeText={setEmail}
-          placeholder="name@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          icon={
-            <Ionicons
-              name="mail-outline"
-              size={18}
-              color="rgba(255,255,255,0.35)"
-            />
-          }
-        />
-
-        <View style={{ height: 18 }} />
-
-        <Text style={styles.label}>Password</Text>
-        <InputPill
-          value={pass}
-          onChangeText={setPass}
-          placeholder="••••••••"
-          secureTextEntry={securePass}
-          autoCapitalize="none"
-          icon={
-            <Ionicons
-              name="lock-closed-outline"
-              size={18}
-              color="rgba(255,255,255,0.35)"
-            />
-          }
-          right={
+          {/* Back button floating */}
+          <View style={styles.topArea}>
             <Pressable
-              onPress={() => setSecurePass((s) => !s)}
-              hitSlop={10}
-              style={styles.rightBtn}
+              onPress={() => router.back()}
+              style={styles.backCircle}
+              hitSlop={12}
             >
               <Ionicons
-                name={securePass ? "eye-outline" : "eye-off-outline"}
-                size={18}
-                color="rgba(255,255,255,0.45)"
+                name="chevron-back"
+                size={22}
+                color="rgba(255,255,255,0.7)"
               />
             </Pressable>
-          }
-        />
+          </View>
 
-        <View style={{ height: 18 }} />
+          <View style={styles.content}>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>
+              Start tracking your 0% installments and{"\n"}save on fees today.
+            </Text>
 
-        <Text style={styles.label}>Confirm Password</Text>
-        <InputPill
-          value={confirm}
-          onChangeText={setConfirm}
-          placeholder="••••••••"
-          secureTextEntry={true}
-          autoCapitalize="none"
-          icon={
-            <MaterialCommunityIcons
-              name="lock-outline"
-              size={18}
-              color="rgba(255,255,255,0.35)"
+            <View style={{ height: 26 }} />
+
+            <Text style={styles.label}>Full Name</Text>
+            <InputPill
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="John Doe"
+              icon={
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color="rgba(255,255,255,0.35)"
+                />
+              }
             />
-          }
-        />
 
-        <View style={{ height: 28 }} />
+            <View style={{ height: 18 }} />
 
-        <Pressable
-          disabled={!canSubmit || loading}
-          onPress={handleRegister}
-          style={({ pressed }) => [
-            styles.primaryBtn,
-            (!canSubmit || loading) && { opacity: 0.55 },
-            pressed &&
-              canSubmit &&
-              !loading && { transform: [{ scale: 0.99 }] },
-          ]}
-        >
-          <Text style={styles.primaryText}>
-            {loading ? "Creating Account..." : "Create Account"}
-          </Text>
-        </Pressable>
+            <Text style={styles.label}>Email Address</Text>
+            <InputPill
+              value={email}
+              onChangeText={setEmail}
+              placeholder="name@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              icon={
+                <Ionicons
+                  name="mail-outline"
+                  size={18}
+                  color="rgba(255,255,255,0.35)"
+                />
+              }
+            />
 
-        {registerError && (
-          <Text
-            style={{
-              color: "#FF4D4D",
-              textAlign: "center",
-              marginTop: 12,
-              fontWeight: "600",
-            }}
-          >
-            {registerError}
-          </Text>
-        )}
+            <View style={{ height: 18 }} />
 
-        <View style={{ height: 18 }} />
+            <Text style={styles.label}>Password</Text>
+            <InputPill
+              value={pass}
+              onChangeText={setPass}
+              placeholder="••••••••"
+              secureTextEntry={securePass}
+              autoCapitalize="none"
+              icon={
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={18}
+                  color="rgba(255,255,255,0.35)"
+                />
+              }
+              right={
+                <Pressable
+                  onPress={() => setSecurePass((s) => !s)}
+                  hitSlop={10}
+                  style={styles.rightBtn}
+                >
+                  <Ionicons
+                    name={securePass ? "eye-outline" : "eye-off-outline"}
+                    size={18}
+                    color="rgba(255,255,255,0.45)"
+                  />
+                </Pressable>
+              }
+            />
 
-        <Text style={styles.legal}>
-          By signing up, you agree to our{" "}
-          <Text
-            style={styles.legalLink}
-            onPress={() => Linking.openURL("https://example.com/terms")}
-          >
-            Terms of Service
-          </Text>{" "}
-          and{" "}
-          <Text
-            style={styles.legalLink}
-            onPress={() => Linking.openURL("https://example.com/privacy")}
-          >
-            Privacy Policy
-          </Text>
-        </Text>
+            <View style={{ height: 18 }} />
 
-        <View style={{ height: 34 }} />
+            <Text style={styles.label}>Confirm Password</Text>
+            <InputPill
+              value={confirm}
+              onChangeText={setConfirm}
+              placeholder="••••••••"
+              secureTextEntry={true}
+              autoCapitalize="none"
+              icon={
+                <MaterialCommunityIcons
+                  name="lock-outline"
+                  size={18}
+                  color="rgba(255,255,255,0.35)"
+                />
+              }
+            />
 
-        <View style={styles.bottomRow}>
-          <Text style={styles.bottomMuted}>Already have an account? </Text>
-          <Pressable onPress={() => router.replace("/(auth)/login")}>
-            <Text style={styles.bottomLink}>Log In</Text>
-          </Pressable>
-        </View>
-      </View>
+            <View style={{ height: 28 }} />
+
+            <Pressable
+              disabled={!canSubmit || loading}
+              onPress={handleRegister}
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                (!canSubmit || loading) && { opacity: 0.55 },
+                pressed &&
+                  canSubmit &&
+                  !loading && { transform: [{ scale: 0.99 }] },
+              ]}
+            >
+              <Text style={styles.primaryText}>
+                {loading ? "Creating Account..." : "Create Account"}
+              </Text>
+            </Pressable>
+
+            {registerError && (
+              <Text
+                style={{
+                  color: "#FF4D4D",
+                  textAlign: "center",
+                  marginTop: 12,
+                  fontWeight: "600",
+                }}
+              >
+                {registerError}
+              </Text>
+            )}
+
+            <View style={{ height: 18 }} />
+
+            <Text style={styles.legal}>
+              By signing up, you agree to our{" "}
+              <Text
+                style={styles.legalLink}
+                onPress={() => Linking.openURL("https://example.com/terms")}
+              >
+                Terms of Service
+              </Text>{" "}
+              and{" "}
+              <Text
+                style={styles.legalLink}
+                onPress={() => Linking.openURL("https://example.com/privacy")}
+              >
+                Privacy Policy
+              </Text>
+            </Text>
+
+            <View style={{ height: 34 }} />
+
+            <View style={styles.bottomRow}>
+              <Text style={styles.bottomMuted}>Already have an account? </Text>
+              <Pressable onPress={() => router.replace("/(auth)/login")}>
+                <Text style={styles.bottomLink}>Log In</Text>
+              </Pressable>
+            </View>
+            <View style={{ height: 40 }} />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -307,7 +321,6 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
     paddingHorizontal: 22,
     paddingTop: 10,
   },

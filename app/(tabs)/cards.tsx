@@ -79,20 +79,15 @@ export default function CardsScreen() {
           <>
             {/* Top bar */}
             <View style={styles.topBar}>
+              <View style={{ width: 44 }} />
+              <Text style={styles.title}>My Cards</Text>
               <Pressable
-                onPress={() => router.back()}
-                style={styles.backCircle}
+                onPress={() => router.push("/cards/new")}
+                style={styles.addBtn}
                 hitSlop={12}
               >
-                <Ionicons
-                  name="chevron-back"
-                  size={22}
-                  color="rgba(255,255,255,0.7)"
-                />
+                <Ionicons name="add" size={28} color="#C9FF00" />
               </Pressable>
-
-              <Text style={styles.title}>My Cards</Text>
-              <View style={{ width: 44 }} />
             </View>
 
             <View style={styles.divider} />
@@ -114,7 +109,7 @@ export default function CardsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No has agregado tarjetas aún.</Text>
-            <Pressable onPress={() => router.push("/(tabs)/cards/new")}>
+            <Pressable onPress={() => router.push("/cards/new")}>
               <Text style={styles.emptyLink}>Agregar mi primera tarjeta</Text>
             </Pressable>
           </View>
@@ -284,14 +279,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  backCircle: {
+  addBtn: {
     width: 44,
     height: 44,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "center",
   },
 
