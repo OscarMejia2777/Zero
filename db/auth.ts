@@ -17,19 +17,25 @@ export async function hashPassword(password: string): Promise<string> {
 /**
  * Registers a new user
  */
-export async function registerUser(email: string, password: string, fullName: string): Promise<User | null> {
+export async function registerUser(
+  email: string,
+  password: string,
+  fullName: string,
+  recoveryQuestion: string,
+  recoveryAnswer: string
+): Promise<User | null> {
   try {
     const hashedPassword = await hashPassword(password);
+    const hashedAnswer = await hashPassword(recoveryAnswer.toLowerCase().trim());
     const cleanEmail = email.toLowerCase().trim();
     const cleanName = fullName.trim();
 
     console.log("[DB] Attempting to insert user:", cleanEmail);
-    
-    // Using simple runAsync which is generally more stable for single operations on web
+
     try {
       const result = await db.runAsync(
-        "INSERT INTO users (email, password_hash, full_name) VALUES (?, ?, ?)",
-        [cleanEmail, hashedPassword, cleanName]
+        "INSERT INTO users (email, password_hash, full_name, recovery_question, recovery_answer_hash) VALUES (?, ?, ?, ?, ?)",
+        [cleanEmail, hashedPassword, cleanName, recoveryQuestion, hashedAnswer]
       );
 
       console.log("[DB] Insert result:", result);
@@ -133,4 +139,42 @@ export async function deleteSession() {
   } else {
     await SecureStore.deleteItemAsync(SESSION_KEY);
   }
+}
+
+/**
+ * Gets the recovery question for an email
+ */
+export async function getRecoveryQuestion(email: string): Promise<string | null> {
+  const user = await db.getFirstAsync<User>(
+    "SELECT recovery_question FROM users WHERE email = ?",
+    [email.toLowerCase().trim()]
+  );
+  return user?.recovery_question || null;
+}
+
+/**
+ * Resets password using security answer
+ */
+export async function resetPassword(
+  email: string,
+  answer: string,
+  newPassword: string
+): Promise<boolean> {
+  const user = await db.getFirstAsync<User>(
+    "SELECT * FROM users WHERE email = ?",
+    [email.toLowerCase().trim()]
+  );
+
+  if (!user) return false;
+
+  const hashedAnswer = await hashPassword(answer.toLowerCase().trim());
+  if (user.recovery_answer_hash === hashedAnswer) {
+    const newHashedPassword = await hashPassword(newPassword);
+    await db.runAsync(
+      "UPDATE users SET password_hash = ? WHERE id = ?",
+      [newHashedPassword, user.id]
+    );
+    return true;
+  }
+  return false;
 }

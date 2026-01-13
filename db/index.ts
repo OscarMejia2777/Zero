@@ -1,6 +1,5 @@
-// Database exports
 export {
-    deleteSession, getCurrentUser, getSession, hashPassword, registerUser, saveSession, validateUser
+    deleteSession, getCurrentUser, getRecoveryQuestion, getSession, hashPassword, registerUser, resetPassword, saveSession, validateUser
 } from "./auth";
 export { db, initDatabase } from "./client";
 export { migrate } from "./migrate";

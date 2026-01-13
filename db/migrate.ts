@@ -18,6 +18,8 @@ export async function migrate() {
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         full_name TEXT,
+        recovery_question TEXT,
+        recovery_answer_hash TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 

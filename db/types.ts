@@ -70,6 +70,8 @@ export interface User {
   email: string;
   password_hash: string;
   full_name: string | null;
+  recovery_question: string | null;
+  recovery_answer_hash: string | null;
   created_at: string;
 }
 

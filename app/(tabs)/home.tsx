@@ -5,12 +5,12 @@ import React, { useCallback, useState } from "react";
 import {
   FlatList,
   Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
 import {
   CARD_COLORS,
@@ -24,6 +24,7 @@ import {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [upcoming, setUpcoming] = useState<PaymentWithDetails[]>([]);
   const [totalMonthly, setTotalMonthly] = useState<number>(0);
   const [activePlansCount, setActivePlansCount] = useState<number>(0);
@@ -83,7 +84,13 @@ export default function HomeScreen() {
       <FlatList
         data={upcoming}
         keyExtractor={(i) => i.id.toString()}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingTop: Math.max(insets.top, 20),
+            paddingBottom: Math.max(insets.bottom, 20) + 100,
+          },
+        ]}
         ListHeaderComponent={
           <>
             <View style={styles.header}>
@@ -191,7 +198,15 @@ export default function HomeScreen() {
           <>
             <View style={{ height: 26 }} />
 
-            <Text style={styles.sectionTitle}>Linked Cards</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Linked Cards</Text>
+              <Pressable
+                onPress={() => router.push("/cards/new")}
+                style={styles.sectionIconBtn}
+              >
+                <Ionicons name="add" size={20} color={LIME} />
+              </Pressable>
+            </View>
 
             <View style={{ height: 14 }} />
 
@@ -363,9 +378,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#05070A" },
 
   listContent: {
-    paddingTop: Platform.OS === "ios" ? 54 : 22,
     paddingHorizontal: 18,
-    paddingBottom: 110,
   },
 
   greenGlowWrap: {

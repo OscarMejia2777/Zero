@@ -24,6 +24,8 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [recoveryQuestion, setRecoveryQuestion] = useState("");
+  const [recoveryAnswer, setRecoveryAnswer] = useState("");
   const [securePass, setSecurePass] = useState(true);
   const [loading, setLoading] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -36,9 +38,11 @@ export default function RegisterScreen() {
       email.trim().includes("@") &&
       pass.length >= 6 &&
       confirm.length >= 6 &&
-      pass === confirm
+      pass === confirm &&
+      recoveryQuestion.trim().length > 5 &&
+      recoveryAnswer.trim().length > 1
     );
-  }, [fullName, email, pass, confirm]);
+  }, [fullName, email, pass, confirm, recoveryQuestion, recoveryAnswer]);
 
   const handleRegister = async () => {
     if (!canSubmit) return;
@@ -47,7 +51,13 @@ export default function RegisterScreen() {
     try {
       setRegisterError(null);
       console.log("[Register] Starting registration for:", email);
-      const user = await registerUser(email, pass, fullName);
+      const user = await registerUser(
+        email,
+        pass,
+        fullName,
+        recoveryQuestion,
+        recoveryAnswer
+      );
       console.log("[Register] User result:", user ? "Success" : "Failed");
 
       if (user) {
@@ -197,6 +207,51 @@ export default function RegisterScreen() {
               }
             />
 
+            <View style={{ height: 26 }} />
+            <View
+              style={{ height: 1, backgroundColor: "rgba(255,255,255,0.1)" }}
+            />
+            <View style={{ height: 26 }} />
+
+            <Text style={styles.sectionTitle}>Account Recovery</Text>
+            <Text style={styles.sectionSub}>
+              In case you forget your password
+            </Text>
+
+            <View style={{ height: 16 }} />
+
+            <Text style={styles.label}>Security Question</Text>
+            <InputPill
+              value={recoveryQuestion}
+              onChangeText={setRecoveryQuestion}
+              placeholder="e.g. name of your first pet?"
+              icon={
+                <Ionicons
+                  name="help-circle-outline"
+                  size={18}
+                  color="rgba(255,255,255,0.35)"
+                />
+              }
+            />
+
+            <View style={{ height: 18 }} />
+
+            <Text style={styles.label}>Security Answer</Text>
+            <InputPill
+              value={recoveryAnswer}
+              onChangeText={setRecoveryAnswer}
+              placeholder="Your answer..."
+              secureTextEntry={true}
+              autoCapitalize="none"
+              icon={
+                <Ionicons
+                  name="key-outline"
+                  size={18}
+                  color="rgba(255,255,255,0.35)"
+                />
+              }
+            />
+
             <View style={{ height: 28 }} />
 
             <Pressable
@@ -323,6 +378,18 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 22,
     paddingTop: 10,
+  },
+
+  sectionTitle: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  sectionSub: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 13,
+    marginBottom: 0,
   },
 
   title: {
