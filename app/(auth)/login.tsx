@@ -6,6 +6,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -50,158 +51,164 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="overflow-auto" style={styles.root}>
+    <View style={styles.root}>
       <LinearGradient
         colors={["#07090D", "#06080B", "#05070A"]}
         locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          hitSlop={12}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={26}
-            color="rgba(255,255,255,0.75)"
-          />
-        </Pressable>
-
-        <Text style={styles.headerTitle}>SECURE LOGIN</Text>
-
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View style={styles.content}>
-        {/* App icon */}
-        <View style={styles.appIcon}>
-          <LinearGradient
-            colors={["#3E7BFF", "#2B56FF", "#2C6BFF"]}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.1, y: 0.0 }}
-            end={{ x: 0.9, y: 1 }}
-          />
-          <View style={styles.appIconInner}>
-            <View style={styles.iconCard} />
-            <View style={styles.iconDot} />
-          </View>
-        </View>
-
-        <Text style={styles.title}>Welcome to Zero</Text>
-        <Text style={styles.subtitle}>
-          Manage your 0% installments and avoid{"\n"}hidden fees effortlessly.
-        </Text>
-
-        {/* Form */}
-        <View style={{ height: 22 }} />
-
-        <Text style={styles.label}>EMAIL ADDRESS</Text>
-        <View style={styles.inputWrap}>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="name@example.com"
-            placeholderTextColor="rgba(255,255,255,0.20)"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-        </View>
-
-        <View style={{ height: 18 }} />
-
-        <View style={styles.passwordRow}>
-          <Text style={styles.label}>PASSWORD</Text>
-          <Pressable onPress={() => {}} hitSlop={10}>
-            <Text style={styles.forgot}>Forgot?</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.inputWrap}>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor="rgba(255,255,255,0.20)"
-            secureTextEntry={secure}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        {/* Header */}
+        <View style={styles.header}>
           <Pressable
-            onPress={() => setSecure((s) => !s)}
-            hitSlop={10}
-            style={styles.eyeBtn}
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            hitSlop={12}
           >
             <Ionicons
-              name={secure ? "eye-outline" : "eye-off-outline"}
-              size={20}
-              color="rgba(255,255,255,0.45)"
+              name="chevron-back"
+              size={26}
+              color="rgba(255,255,255,0.75)"
             />
           </Pressable>
+
+          <Text style={styles.headerTitle}>SECURE LOGIN</Text>
+
+          <View style={{ width: 40 }} />
         </View>
 
-        <View style={{ height: 22 }} />
+        <View style={styles.content}>
+          {/* App icon */}
+          <View style={styles.appIcon}>
+            <LinearGradient
+              colors={["#3E7BFF", "#2B56FF", "#2C6BFF"]}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0.1, y: 0.0 }}
+              end={{ x: 0.9, y: 1 }}
+            />
+            <View style={styles.appIconInner}>
+              <View style={styles.iconCard} />
+              <View style={styles.iconDot} />
+            </View>
+          </View>
 
-        <Pressable
-          onPress={handleSignIn}
-          disabled={!canSubmit || loading}
-          style={({ pressed }) => [
-            styles.signInBtn,
-            (!canSubmit || loading) && { opacity: 0.55 },
-            pressed &&
-              canSubmit &&
-              !loading && { transform: [{ scale: 0.99 }] },
-          ]}
-        >
-          <Text style={styles.signInText}>
-            {loading ? "Signing in..." : "Sign In"}
+          <Text style={styles.title}>Welcome to Zero</Text>
+          <Text style={styles.subtitle}>
+            Manage your 0% installments and avoid{"\n"}hidden fees effortlessly.
           </Text>
-        </Pressable>
 
-        {/* Secure access */}
-        <View style={{ height: 26 }} />
+          {/* Form */}
+          <View style={{ height: 22 }} />
 
-        <View style={styles.secureAccessRow}>
-          <View style={styles.line} />
-          <Text style={styles.secureAccessText}>SECURE ACCESS</Text>
-          <View style={styles.line} />
-        </View>
-
-        <View style={{ height: 16 }} />
-
-        <View style={styles.quickRow}>
-          <Pressable style={styles.quickBtn} onPress={() => {}}>
-            <MaterialCommunityIcons
-              name="face-recognition"
-              size={26}
-              color="rgba(255,255,255,0.78)"
+          <Text style={styles.label}>EMAIL ADDRESS</Text>
+          <View style={styles.inputWrap}>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="name@example.com"
+              placeholderTextColor="rgba(255,255,255,0.20)"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
             />
-          </Pressable>
+          </View>
 
-          <Pressable style={styles.quickBtn} onPress={() => {}}>
-            <Ionicons
-              name="finger-print"
-              size={26}
-              color="rgba(255,255,255,0.78)"
+          <View style={{ height: 18 }} />
+
+          <View style={styles.passwordRow}>
+            <Text style={styles.label}>PASSWORD</Text>
+            <Pressable onPress={() => {}} hitSlop={10}>
+              <Text style={styles.forgot}>Forgot?</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.inputWrap}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor="rgba(255,255,255,0.20)"
+              secureTextEntry={secure}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
             />
-          </Pressable>
-        </View>
+            <Pressable
+              onPress={() => setSecure((s) => !s)}
+              hitSlop={10}
+              style={styles.eyeBtn}
+            >
+              <Ionicons
+                name={secure ? "eye-outline" : "eye-off-outline"}
+                size={20}
+                color="rgba(255,255,255,0.45)"
+              />
+            </Pressable>
+          </View>
 
-        <View style={{ height: 20 }} />
+          <View style={{ height: 22 }} />
 
-        <View style={styles.createRow}>
-          <Text style={styles.createMuted}>New to Zero? </Text>
-          <Pressable onPress={() => router.push("/(auth)/register")}>
-            <Text style={styles.createLink}>Create Account</Text>
+          <Pressable
+            onPress={handleSignIn}
+            disabled={!canSubmit || loading}
+            style={({ pressed }) => [
+              styles.signInBtn,
+              (!canSubmit || loading) && { opacity: 0.55 },
+              pressed &&
+                canSubmit &&
+                !loading && { transform: [{ scale: 0.99 }] },
+            ]}
+          >
+            <Text style={styles.signInText}>
+              {loading ? "Signing in..." : "Sign In"}
+            </Text>
           </Pressable>
+
+          {/* Secure access */}
+          <View style={{ height: 26 }} />
+
+          <View style={styles.secureAccessRow}>
+            <View style={styles.line} />
+            <Text style={styles.secureAccessText}>SECURE ACCESS</Text>
+            <View style={styles.line} />
+          </View>
+
+          <View style={{ height: 16 }} />
+
+          <View style={styles.quickRow}>
+            <Pressable style={styles.quickBtn} onPress={() => {}}>
+              <MaterialCommunityIcons
+                name="face-recognition"
+                size={26}
+                color="rgba(255,255,255,0.78)"
+              />
+            </Pressable>
+
+            <Pressable style={styles.quickBtn} onPress={() => {}}>
+              <Ionicons
+                name="finger-print"
+                size={26}
+                color="rgba(255,255,255,0.78)"
+              />
+            </Pressable>
+          </View>
+
+          <View style={{ height: 20 }} />
+
+          <View style={styles.createRow}>
+            <Text style={styles.createMuted}>New to Zero? </Text>
+            <Pressable onPress={() => router.push("/(auth)/register")}>
+              <Text style={styles.createLink}>Create Account</Text>
+            </Pressable>
+          </View>
+          <View style={{ height: 40 }} />
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
