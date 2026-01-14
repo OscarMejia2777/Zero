@@ -16,6 +16,7 @@ interface AuthContextType {
   hasStoredToken: boolean;
   signIn: (user: User) => Promise<void>;
   signOut: () => Promise<void>;
+  strictSignOut: () => Promise<void>;
   unlockApp: () => void;
   restoreSession: () => Promise<void>;
 }
@@ -105,7 +106,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/(tabs)/home");
   };
 
+  // Soft logout: Clear memory but keep SecureStore session for Biometrics
   const signOut = async () => {
+    // await deleteSession(); // <-- Removed based on new requirements
+    setUser(null);
+    setIsLocked(false);
+    // Keep hasStoredToken = true so Login screen shows Biometric option
+    setHasStoredToken(true);
+  };
+
+  // Hard logout: Fully remove session (e.g. Delete Account, manual cleanup)
+  const strictSignOut = async () => {
     await deleteSession();
     setUser(null);
     setIsLocked(false);
@@ -135,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasStoredToken,
         signIn,
         signOut,
+        strictSignOut,
         unlockApp,
         restoreSession,
       }}

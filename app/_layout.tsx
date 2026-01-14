@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
-import React, { useEffect } from "react";
+import * as SplashScreen from "expo-splash-screen";
+import React, { useCallback, useEffect } from "react";
 import { AuthProvider } from "../context/AuthContext";
 import { initDatabase, migrate } from "../db";
 import {
@@ -10,6 +11,9 @@ import {
 
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -42,12 +46,19 @@ export default function RootLayout() {
     setup();
   }, []);
 
+  const onLayoutRootView = useCallback(async () => {
+    if (dbReady) {
+      // This tells the native splash screen to hide immediately
+      await SplashScreen.hideAsync();
+    }
+  }, [dbReady]);
+
   if (!dbReady) {
-    return null; // Keep splash screen visible until DB is ready
+    return null;
   }
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider onLayout={onLayoutRootView}>
       <AuthProvider>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false }}>
