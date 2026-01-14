@@ -1,12 +1,66 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { Platform } from "react-native";
 
 export default function TabsLayout() {
   return (
-    <Tabs>
-      <Tabs.Screen name="home" options={{ title: "Home" }} />
-      <Tabs.Screen name="payments" options={{ title: "Payments" }} />
-      <Tabs.Screen name="cards" options={{ title: "Cards" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: "#05070A",
+          borderTopColor: "rgba(255,255,255,0.08)",
+          height: Platform.OS === "android" ? 88 : 64,
+          paddingBottom: Platform.OS === "android" ? 32 : 8,
+          paddingTop: 8,
+        },
+        tabBarActiveTintColor: "#C9FF00",
+        tabBarInactiveTintColor: "rgba(255,255,255,0.35)",
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "700",
+          marginTop: 4,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="payments"
+        options={{
+          title: "Payments",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="cards"
+        options={{
+          title: "Cards",
+          href: null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="card-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

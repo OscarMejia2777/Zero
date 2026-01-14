@@ -1,9 +1,11 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +14,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
+import { CARD_COLORS, createPurchase, getAllCards, type Card } from "../../db";
+import { syncPaymentNotifications } from "../../lib/notifications";
 
 type Period = 3 | 6 | 12 | 24;
 
@@ -19,11 +24,30 @@ export default function AddPurchaseScreen() {
   const router = useRouter();
 
   const [description, setDescription] = useState("");
-  const [amountText, setAmountText] = useState(""); // user typed
+  const [store, setStore] = useState("");
+  const [amountText, setAmountText] = useState("");
   const [period, setPeriod] = useState<Period>(12);
 
-  // demo simple: método fijo
-  const [paymentMethod, setPaymentMethod] = useState("Premium Card (....4421)");
+  const [cards, setCards] = useState<Card[]>([]);
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [showCardModal, setShowCardModal] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    const fetch = async () => {
+      try {
+        const fetched = await getAllCards(user.id);
+        setCards(fetched);
+        if (fetched.length > 0) {
+          setSelectedCard(fetched[0]);
+        }
+      } catch (error) {
+        console.error("Error loading cards:", error);
+      }
+    };
+    fetch();
+  }, [user]);
 
   const amount = useMemo(() => {
     const n = Number(amountText.replace(/[^\d.]/g, ""));
@@ -36,8 +60,34 @@ export default function AddPurchaseScreen() {
   }, [amount, period]);
 
   const canSubmit = useMemo(() => {
-    return description.trim().length > 0 && amount > 0 && period > 0;
-  }, [description, amount, period]);
+    return (
+      description.trim().length > 0 &&
+      store.trim().length > 0 &&
+      amount > 0 &&
+      period > 0 &&
+      selectedCard !== null
+    );
+  }, [description, store, amount, period, selectedCard]);
+
+  const handleSave = async () => {
+    if (!canSubmit || !user || !selectedCard) return;
+
+    try {
+      await createPurchase({
+        user_id: user.id,
+        card_id: selectedCard.id,
+        description: description.trim(),
+        store: store.trim(),
+        total_amount: amount,
+        installments: period,
+        start_date: new Date().toISOString(),
+      });
+      router.back();
+      syncPaymentNotifications();
+    } catch (error) {
+      console.error("Error creating purchase:", error);
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -87,7 +137,20 @@ export default function AddPurchaseScreen() {
               <TextInput
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Description (e.g. Laptop)"
+                placeholder="Description (e.g. iPhone 16)"
+                placeholderTextColor="rgba(255,255,255,0.18)"
+                style={styles.input}
+              />
+            </View>
+
+            <View style={{ height: 16 }} />
+
+            {/* Store */}
+            <View style={styles.pill}>
+              <TextInput
+                value={store}
+                onChangeText={setStore}
+                placeholder="Store (e.g. Apple Store)"
                 placeholderTextColor="rgba(255,255,255,0.18)"
                 style={styles.input}
               />
@@ -111,7 +174,7 @@ export default function AddPurchaseScreen() {
                   onChangeText={setAmountText}
                   placeholder="Total Amount"
                   placeholderTextColor="rgba(255,255,255,0.18)"
-                  keyboardType="numbers-and-punctuation"
+                  keyboardType="numeric"
                   style={[styles.input, { paddingVertical: 0 }]}
                 />
               </View>
@@ -155,26 +218,34 @@ export default function AddPurchaseScreen() {
             <View style={{ height: 12 }} />
 
             <Pressable
-              onPress={() => {
-                // demo simple: alterna opciones
-                setPaymentMethod((v) =>
-                  v.includes("4421")
-                    ? "Slate Digital (....9901)"
-                    : "Premium Card (....4421)"
-                );
-              }}
+              onPress={() => setShowCardModal(true)}
               style={styles.pillRow}
             >
-              <Text style={styles.pillValue}>{paymentMethod}</Text>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                {selectedCard && (
+                  <View
+                    style={[
+                      styles.cardDot,
+                      {
+                        backgroundColor: CARD_COLORS.find(
+                          (c) => c.value === selectedCard.color
+                        )?.hex,
+                      },
+                    ]}
+                  />
+                )}
+                <Text style={styles.pillValue}>
+                  {selectedCard
+                    ? `${selectedCard.bank_name} (....${selectedCard.last4})`
+                    : "Select a card"}
+                </Text>
+              </View>
               <View style={styles.chevrons}>
                 <Ionicons
-                  name="chevron-up"
-                  size={16}
-                  color="rgba(255,255,255,0.55)"
-                />
-                <Ionicons
                   name="chevron-down"
-                  size={16}
+                  size={20}
                   color="rgba(255,255,255,0.55)"
                 />
               </View>
@@ -216,10 +287,7 @@ export default function AddPurchaseScreen() {
           <View style={styles.bottom}>
             <Pressable
               disabled={!canSubmit}
-              onPress={() => {
-                // aquí luego guardarías en SQLite + generar el plan de pagos
-                router.back();
-              }}
+              onPress={handleSave}
               style={({ pressed }) => [
                 styles.primaryBtn,
                 !canSubmit && { opacity: 0.55 },
@@ -234,6 +302,77 @@ export default function AddPurchaseScreen() {
               />
             </Pressable>
           </View>
+
+          {/* Card Selection Modal */}
+          <Modal visible={showCardModal} transparent animationType="slide">
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setShowCardModal(false)}
+            >
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Choose a Card</Text>
+
+                <FlatList
+                  data={cards}
+                  keyExtractor={(c) => c.id.toString()}
+                  renderItem={({ item }) => {
+                    const isSelected = selectedCard?.id === item.id;
+                    const config =
+                      CARD_COLORS.find((c) => c.value === item.color) ||
+                      CARD_COLORS[2];
+                    return (
+                      <Pressable
+                        onPress={() => {
+                          setSelectedCard(item);
+                          setShowCardModal(false);
+                        }}
+                        style={[
+                          styles.cardOption,
+                          isSelected && styles.cardOptionSelected,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.cardDot,
+                            { backgroundColor: config.hex },
+                          ]}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.optionText}>
+                            {item.bank_name}
+                          </Text>
+                          <Text style={styles.optionSub}>
+                            {item.name} • • • • {item.last4}
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={24}
+                            color={BLUE}
+                          />
+                        )}
+                      </Pressable>
+                    );
+                  }}
+                  ListEmptyComponent={
+                    <View style={{ alignItems: "center", marginTop: 40 }}>
+                      <Text style={styles.optionSub}>
+                        No has agregado tarjetas aún.
+                      </Text>
+                    </View>
+                  }
+                />
+
+                <Pressable
+                  onPress={() => setShowCardModal(false)}
+                  style={styles.closeBtn}
+                >
+                  <Text style={styles.closeText}>Close</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Modal>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -435,14 +574,9 @@ const styles = StyleSheet.create({
   },
 
   bottom: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     paddingHorizontal: 18,
     paddingBottom: Platform.OS === "ios" ? 26 : 18,
     paddingTop: 10,
-    backgroundColor: "rgba(0,0,0,0.35)",
   },
   primaryBtn: {
     height: 70,
@@ -461,5 +595,71 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.95)",
     fontSize: 20,
     fontWeight: "900",
+  },
+  cardDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#0F1218",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 24,
+    minHeight: 400,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  cardOption: {
+    height: 70,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  cardOptionSelected: {
+    borderColor: BLUE,
+    backgroundColor: "rgba(47,99,255,0.12)",
+  },
+  optionText: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 16,
+    fontWeight: "800",
+    paddingVertical: 10,
+  },
+  optionSub: {
+    color: "rgba(255,255,255,0.35)",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  closeBtn: {
+    marginTop: 10,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 16,
+    fontWeight: "800",
   },
 });
