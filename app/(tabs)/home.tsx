@@ -178,7 +178,7 @@ export default function HomeScreen() {
               <Pressable style={styles.sectionIconBtn} onPress={() => {}}>
                 <MaterialCommunityIcons
                   name="swap-horizontal"
-                  size={18}
+                  size={16}
                   color="rgba(255,255,255,0.55)"
                 />
               </Pressable>

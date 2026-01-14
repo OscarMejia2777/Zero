@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
@@ -24,7 +25,7 @@ export default function LoginScreen() {
   const [secure, setSecure] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const { signIn } = useAuth();
+  const { signIn, hasStoredToken, restoreSession } = useAuth();
 
   const canSubmit = useMemo(() => {
     return email.trim().includes("@") && password.length >= 6;
@@ -48,6 +49,34 @@ export default function LoginScreen() {
       Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        Alert.alert(
+          "Biometrics Unavailable",
+          "Your device does not support biometrics or none are enrolled."
+        );
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Login with Biometrics",
+        fallbackLabel: "Use Passcode",
+      });
+
+      if (result.success) {
+        await restoreSession();
+      }
+      // If failed or cancelled, do nothing (stay on login)
+    } catch (error) {
+      console.error("[Login] Biometric error:", error);
+      Alert.alert("Error", "Biometric authentication failed.");
     }
   };
 
@@ -179,34 +208,44 @@ export default function LoginScreen() {
               </Text>
             </Pressable>
 
-            {/* Secure access */}
-            <View style={{ height: 26 }} />
+            {/* Secure access - Only show if we have a stored token */}
+            {hasStoredToken && (
+              <>
+                <View style={{ height: 26 }} />
 
-            <View style={styles.secureAccessRow}>
-              <View style={styles.line} />
-              <Text style={styles.secureAccessText}>SECURE ACCESS</Text>
-              <View style={styles.line} />
-            </View>
+                <View style={styles.secureAccessRow}>
+                  <View style={styles.line} />
+                  <Text style={styles.secureAccessText}>SECURE ACCESS</Text>
+                  <View style={styles.line} />
+                </View>
 
-            <View style={{ height: 16 }} />
+                <View style={{ height: 16 }} />
 
-            <View style={styles.quickRow}>
-              <Pressable style={styles.quickBtn} onPress={() => {}}>
-                <MaterialCommunityIcons
-                  name="face-recognition"
-                  size={26}
-                  color="rgba(255,255,255,0.78)"
-                />
-              </Pressable>
+                <View style={styles.quickRow}>
+                  <Pressable
+                    style={styles.quickBtn}
+                    onPress={handleBiometricAuth}
+                  >
+                    <MaterialCommunityIcons
+                      name="face-recognition"
+                      size={26}
+                      color="rgba(255,255,255,0.78)"
+                    />
+                  </Pressable>
 
-              <Pressable style={styles.quickBtn} onPress={() => {}}>
-                <Ionicons
-                  name="finger-print"
-                  size={26}
-                  color="rgba(255,255,255,0.78)"
-                />
-              </Pressable>
-            </View>
+                  <Pressable
+                    style={styles.quickBtn}
+                    onPress={handleBiometricAuth}
+                  >
+                    <Ionicons
+                      name="finger-print"
+                      size={26}
+                      color="rgba(255,255,255,0.78)"
+                    />
+                  </Pressable>
+                </View>
+              </>
+            )}
 
             <View style={{ height: 20 }} />
 

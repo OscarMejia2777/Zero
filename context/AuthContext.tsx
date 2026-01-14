@@ -7,15 +7,17 @@ import React, {
   useState,
 } from "react";
 import { AppState } from "react-native";
-import { deleteSession, getCurrentUser, type User } from "../db";
+import { deleteSession, getCurrentUser, getSession, type User } from "../db";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isLocked: boolean;
+  hasStoredToken: boolean;
   signIn: (user: User) => Promise<void>;
   signOut: () => Promise<void>;
   unlockApp: () => void;
+  restoreSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
+  const [hasStoredToken, setHasStoredToken] = useState(false);
   const appState = useRef(AppState.currentState);
   const router = useRouter();
   const segments = useSegments();
@@ -32,10 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initial session check
     const initAuth = async () => {
       try {
-        const u = await getCurrentUser();
-        if (u) {
-          setUser(u);
-          setIsLocked(true); // Always lock on cold start if user exists
+        const userId = await getSession();
+        if (userId) {
+          setHasStoredToken(true);
+          // Do NOT automatically log in. Wait for biometric/manual login.
+        } else {
+          setHasStoredToken(false);
         }
       } catch (e) {
         console.error("[AuthProvider] Init error:", e);
@@ -92,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (u: User) => {
     setUser(u);
     setIsLocked(false);
+    setHasStoredToken(true);
   };
 
   const unlockApp = () => {
@@ -103,11 +109,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await deleteSession();
     setUser(null);
     setIsLocked(false);
+    setHasStoredToken(false);
+  };
+
+  const restoreSession = async () => {
+    try {
+      const u = await getCurrentUser();
+      if (u) {
+        setUser(u);
+        setIsLocked(false);
+      }
+    } catch (e) {
+      console.error("[AuthProvider] Restore session error:", e);
+      // Optional: if restore fails, maybe clear token?
+      // For now, let UI handle error or retry.
+    }
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, isLocked, signIn, signOut, unlockApp }}
+      value={{
+        user,
+        loading,
+        isLocked,
+        hasStoredToken,
+        signIn,
+        signOut,
+        unlockApp,
+        restoreSession,
+      }}
     >
       {children}
     </AuthContext.Provider>
