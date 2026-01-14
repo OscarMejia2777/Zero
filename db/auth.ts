@@ -178,3 +178,23 @@ export async function resetPassword(
   }
   return false;
 }
+
+/**
+ * Updates the user's password directly (requires knowing the ID)
+ */
+export async function updateUserPassword(
+  userId: number,
+  newPassword: string
+): Promise<boolean> {
+  try {
+    const newHashedPassword = await hashPassword(newPassword);
+    await db.runAsync(
+      "UPDATE users SET password_hash = ? WHERE id = ?",
+      [newHashedPassword, userId]
+    );
+    return true;
+  } catch (error) {
+    console.error("[Auth] Update password error:", error);
+    return false;
+  }
+}

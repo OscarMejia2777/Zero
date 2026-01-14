@@ -1,15 +1,8 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import {
-  FlatList,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -21,6 +14,7 @@ import {
   type Card,
   type PaymentWithDetails,
 } from "../../db";
+import { syncPaymentNotifications } from "../../lib/notifications";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -95,24 +89,18 @@ export default function HomeScreen() {
           <>
             <View style={styles.header}>
               <View style={styles.headerLeft}>
-                <View style={styles.avatar}>
-                  <Image
-                    source={{
-                      uri: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=60",
-                    }}
-                    style={styles.avatarImg}
-                  />
-                </View>
-
                 <View>
                   <Text style={styles.portfolio}>PORTFOLIO</Text>
-                  <Text style={styles.name}>
-                    {user?.full_name?.split(" ")[0] || "User"}
-                  </Text>
+                  <Text style={styles.name}>{user?.full_name || "User"}</Text>
                 </View>
               </View>
 
-              <Pressable style={styles.iconCircle} onPress={() => {}}>
+              <Pressable
+                style={styles.iconCircle}
+                onPress={() => {
+                  syncPaymentNotifications();
+                }}
+              >
                 <Ionicons
                   name="notifications"
                   size={20}
@@ -174,14 +162,6 @@ export default function HomeScreen() {
                 <Text style={styles.sectionTitle}>Next Payments</Text>
                 <Text style={styles.sectionSub}>Upcoming 7 days window</Text>
               </View>
-
-              <Pressable style={styles.sectionIconBtn} onPress={() => {}}>
-                <MaterialCommunityIcons
-                  name="swap-horizontal"
-                  size={16}
-                  color="rgba(255,255,255,0.55)"
-                />
-              </Pressable>
             </View>
           </>
         }
@@ -256,7 +236,7 @@ export default function HomeScreen() {
                       <View
                         style={[styles.aprDot, { backgroundColor: config.hex }]}
                       />
-                      <Text style={styles.aprText}>0% APR Active</Text>
+                      <Text style={styles.aprText}>Standard Credit</Text>
                     </View>
                   </Pressable>
                 );
@@ -305,10 +285,6 @@ export default function HomeScreen() {
           </>
         }
       />
-
-      <Pressable style={styles.floatBtn} onPress={() => {}}>
-        <Ionicons name="stats-chart" size={18} color="rgba(255,255,255,0.9)" />
-      </Pressable>
     </View>
   );
 }

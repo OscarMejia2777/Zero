@@ -1,14 +1,31 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useAuth } from "../../context/AuthContext";
+import { syncPaymentNotifications } from "../../lib/notifications";
 
 export default function Profile() {
   const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
+  };
+
+  const handleNotificationSetup = async () => {
+    await syncPaymentNotifications();
+    Alert.alert("Notifications", "System notifications synced.");
+  };
+
+  const handleSecurity = () => {
+    Alert.alert("Security", "PIN management coming soon.");
   };
 
   return (
@@ -41,15 +58,19 @@ export default function Profile() {
             </Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.full_name || "User"}</Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
+            <Text style={styles.userName} numberOfLines={1}>
+              {user?.full_name || "User"}
+            </Text>
+            <Text style={styles.userEmail} numberOfLines={2}>
+              {user?.email}
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ACCOUNT SETTINGS</Text>
 
-          <Pressable style={styles.menuItem}>
+          <Pressable style={styles.menuItem} onPress={handleSecurity}>
             <View style={styles.menuLeft}>
               <View style={styles.menuIcon}>
                 <Ionicons
@@ -67,7 +88,7 @@ export default function Profile() {
             />
           </Pressable>
 
-          <Pressable style={styles.menuItem}>
+          <Pressable style={styles.menuItem} onPress={handleNotificationSetup}>
             <View style={styles.menuLeft}>
               <View style={styles.menuIcon}>
                 <Ionicons
@@ -147,6 +168,7 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     marginLeft: 20,
+    flex: 1, // Allow text to take remaining space
   },
   userName: {
     color: "rgba(255,255,255,0.95)",

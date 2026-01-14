@@ -55,6 +55,7 @@ export default function PaymentsScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
+      syncPaymentNotifications(); // Check/Schedule notifications on visit
     }, [fetchData])
   );
 
@@ -122,7 +123,10 @@ export default function PaymentsScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { minHeight: "100%", paddingBottom: 120 }, // Ensure scrolling and filling
+        ]}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
           <>
@@ -141,15 +145,11 @@ export default function PaymentsScreen() {
 
               <View style={styles.topRight}>
                 <Pressable
-                  style={styles.iconHit}
+                  style={styles.addBtnHighVis}
                   onPress={() => router.push("/purchases/new")}
-                  hitSlop={10}
                 >
-                  <Ionicons
-                    name="add"
-                    size={24}
-                    color="rgba(255,255,255,0.65)"
-                  />
+                  <Ionicons name="add" size={24} color="#0B0F10" />
+                  <Text style={styles.addBtnText}>ADD PAYMENT</Text>
                 </Pressable>
               </View>
             </View>
@@ -169,14 +169,6 @@ export default function PaymentsScreen() {
                   <Text style={styles.summaryValue}>
                     ${totalMonthly.toFixed(2)}
                   </Text>
-                </View>
-
-                <View style={styles.walletBox}>
-                  <Ionicons
-                    name="wallet-outline"
-                    size={26}
-                    color="rgba(255,255,255,0.35)"
-                  />
                 </View>
               </View>
 
@@ -558,6 +550,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  addBtnHighVis: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#C9FF00",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    gap: 6,
+  },
+  addBtnText: {
+    color: "#0B0F10",
+    fontWeight: "900",
+    fontSize: 13,
   },
   statusDot: { width: 8, height: 8, borderRadius: 99 },
   statusText: { fontWeight: "900", fontSize: 11, letterSpacing: 1.2 },
