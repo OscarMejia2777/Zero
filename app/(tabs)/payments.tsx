@@ -1,8 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   Platform,
   Pressable,
   SectionList,
@@ -10,83 +11,106 @@ import {
   Text,
   View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
+import {
+  CARD_COLORS,
+  getActivePurchaseCount,
+  getAllPayments,
+  getMonthlyTotal,
+  markPaymentAsPaid,
+  type PaymentWithDetails,
+} from "../../db";
+import { syncPaymentNotifications } from "../../lib/notifications";
 
 type Filter = "All" | "Pending" | "Paid" | "Overdue";
-
-type PayItem = {
-  id: string;
-  title: string;
-  meta: string; // store • date
-  amount: string;
-  status: "action" | "left" | "paid";
-  statusText: string; // e.g. "4 DAYS LEFT" or "PAID"
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-};
-
-type Section = {
-  title: string;
-  rightLabel?: string; // e.g. ACTION REQUIRED
-  data: PayItem[];
-};
-
-const DATA: Section[] = [
-  {
-    title: "NEXT 7 DAYS",
-    rightLabel: "ACTION REQUIRED",
-    data: [
-      {
-        id: "1",
-        title: "iPhone 15 Pro Max",
-        meta: "Apple Store • Oct 18",
-        amount: "$83.33",
-        status: "action",
-        statusText: "4 DAYS LEFT",
-        icon: "cellphone",
-      },
-      {
-        id: "2",
-        title: "AirPods Max",
-        meta: "Best Buy • Oct 20",
-        amount: "$45.00",
-        status: "left",
-        statusText: "6 DAYS LEFT",
-        icon: "headphones",
-      },
-    ],
-  },
-  {
-    title: "LATER THIS MONTH",
-    data: [
-      {
-        id: "3",
-        title: "MacBook Air M3",
-        meta: "Apple Finance • Oct 24",
-        amount: "$112.50",
-        status: "paid",
-        statusText: "PAID",
-        icon: "check",
-      },
-      {
-        id: "4",
-        title: "Herman Miller",
-        meta: "DWR • Oct 28",
-        amount: "$155.00",
-        status: "left",
-        statusText: "14 DAYS LEFT",
-        icon: "sofa-single-outline",
-      },
-    ],
-  },
-];
 
 export default function PaymentsScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("All");
+  const [payments, setPayments] = useState<PaymentWithDetails[]>([]);
+  const [totalMonthly, setTotalMonthly] = useState(0);
+  const [activePlans, setActivePlans] = useState(0);
+  const { user } = useAuth();
+
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const filterArg =
+        filter === "All" ? undefined : (filter.toLowerCase() as any);
+
+      const [paymentsData, total, count] = await Promise.all([
+        getAllPayments(user.id, filterArg),
+        getMonthlyTotal(user.id),
+        getActivePurchaseCount(user.id),
+      ]);
+
+      setPayments(paymentsData);
+      setTotalMonthly(total);
+      setActivePlans(count);
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+    }
+  }, [filter, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+      syncPaymentNotifications(); // Check/Schedule notifications on visit
+    }, [fetchData])
+  );
 
   const sections = useMemo(() => {
-    // demo: no filtra real, pero ya queda lista la estructura
-    return DATA;
-  }, [filter]);
+    const overdue = payments.filter(
+      (p) =>
+        !p.is_paid &&
+        new Date(p.due_date) < new Date(new Date().setHours(0, 0, 0, 0))
+    );
+    const pending = payments.filter(
+      (p) =>
+        !p.is_paid &&
+        new Date(p.due_date) >= new Date(new Date().setHours(0, 0, 0, 0))
+    );
+    const paid = payments.filter((p) => p.is_paid);
+
+    const result = [];
+    if (overdue.length > 0) {
+      result.push({
+        title: "OVERDUE",
+        rightLabel: "ACTION REQUIRED",
+        data: overdue,
+      });
+    }
+    if (pending.length > 0) {
+      result.push({ title: "UPCOMING / PENDING", data: pending });
+    }
+    if (paid.length > 0) {
+      result.push({ title: "PAID", data: paid });
+    }
+    return result;
+  }, [payments]);
+
+  const handleMarkPaid = (id: number, currentPaid: boolean) => {
+    if (currentPaid) return;
+
+    const perform = () => {
+      markPaymentAsPaid(id);
+      fetchData();
+      syncPaymentNotifications();
+    };
+
+    if (Platform.OS === "web") {
+      if (confirm("¿Marcar este pago como completado?")) perform();
+    } else {
+      Alert.alert(
+        "Marcar como pagado",
+        "¿Confirmas que ya realizaste este pago?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Sí, pagado", onPress: perform },
+        ]
+      );
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -98,12 +122,14 @@ export default function PaymentsScreen() {
 
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.content}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={[
+          styles.content,
+          { minHeight: "100%", paddingBottom: 120 }, // Ensure scrolling and filling
+        ]}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
           <>
-            {/* Top bar */}
             <View style={styles.topBar}>
               <Pressable
                 onPress={() => router.back()}
@@ -119,33 +145,17 @@ export default function PaymentsScreen() {
 
               <View style={styles.topRight}>
                 <Pressable
-                  style={styles.iconHit}
-                  onPress={() => {}}
-                  hitSlop={10}
+                  style={styles.addBtnHighVis}
+                  onPress={() => router.push("/purchases/new")}
                 >
-                  <Ionicons
-                    name="search"
-                    size={20}
-                    color="rgba(255,255,255,0.65)"
-                  />
-                </Pressable>
-                <Pressable
-                  style={styles.iconHit}
-                  onPress={() => {}}
-                  hitSlop={10}
-                >
-                  <Ionicons
-                    name="add"
-                    size={24}
-                    color="rgba(255,255,255,0.65)"
-                  />
+                  <Ionicons name="add" size={24} color="#0B0F10" />
+                  <Text style={styles.addBtnText}>ADD PAYMENT</Text>
                 </Pressable>
               </View>
             </View>
 
-            <Text style={styles.pageTitle}>Upcoming</Text>
+            <Text style={styles.pageTitle}>Payments</Text>
 
-            {/* Summary card */}
             <View style={styles.summaryCard}>
               <LinearGradient
                 colors={["rgba(255,255,255,0.10)", "rgba(255,255,255,0.03)"]}
@@ -156,39 +166,19 @@ export default function PaymentsScreen() {
               <View style={styles.summaryTop}>
                 <View>
                   <Text style={styles.summaryLabel}>MONTHLY TOTAL</Text>
-                  <Text style={styles.summaryValue}>$1,240.50</Text>
-                </View>
-
-                <View style={styles.walletBox}>
-                  <Ionicons
-                    name="wallet-outline"
-                    size={26}
-                    color="rgba(255,255,255,0.35)"
-                  />
+                  <Text style={styles.summaryValue}>
+                    ${totalMonthly.toFixed(2)}
+                  </Text>
                 </View>
               </View>
 
               <View style={styles.summaryBottom}>
-                <View style={styles.pager}>
-                  <View style={styles.pagerDotActive}>
-                    <Text style={styles.pagerTextActive}>1</Text>
-                  </View>
-                  <View style={styles.pagerDot}>
-                    <Text style={styles.pagerText}>2</Text>
-                  </View>
-                </View>
-
                 <Text style={styles.activePlansText}>
-                  4 active installments
+                  {activePlans} active plans being monitored
                 </Text>
-
-                <View style={styles.progressTrack}>
-                  <View style={styles.progressFill} />
-                </View>
               </View>
             </View>
 
-            {/* Filters */}
             <View style={styles.filters}>
               <FilterPill
                 label="All"
@@ -223,13 +213,22 @@ export default function PaymentsScreen() {
                 <View style={styles.redDot} />
                 <Text style={styles.actionText}>{section.rightLabel}</Text>
               </View>
-            ) : (
-              <View />
-            )}
+            ) : null}
           </View>
         )}
-        renderItem={({ item }) => <PayRow item={item} />}
+        renderItem={({ item }) => (
+          <Pressable onPress={() => handleMarkPaid(item.id, item.is_paid)}>
+            <PayRow item={item} />
+          </Pressable>
+        )}
         ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
+        ListEmptyComponent={
+          <View style={{ alignItems: "center", marginTop: 40 }}>
+            <Text style={{ color: "rgba(255,255,255,0.2)", fontSize: 16 }}>
+              No hay pagos que mostrar.
+            </Text>
+          </View>
+        }
         ListFooterComponent={<View style={{ height: 30 }} />}
       />
     </View>
@@ -260,52 +259,30 @@ function FilterPill({
   );
 }
 
-function PayRow({ item }: { item: PayItem }) {
-  const right = (() => {
-    if (item.status === "paid") {
-      return (
-        <View style={styles.statusRow}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: "rgba(64,255,197,0.9)" },
-            ]}
-          />
-          <Text style={[styles.statusText, { color: "rgba(64,255,197,0.85)" }]}>
-            {item.statusText}
-          </Text>
-        </View>
-      );
-    }
-    if (item.status === "action") {
-      return (
-        <View style={styles.statusRow}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: "rgba(255,90,90,0.9)" },
-            ]}
-          />
-          <Text style={[styles.statusText, { color: "rgba(255,90,90,0.85)" }]}>
-            {item.statusText}
-          </Text>
-        </View>
-      );
-    }
-    return (
-      <View style={styles.statusRow}>
-        <View
-          style={[
-            styles.statusDot,
-            { backgroundColor: "rgba(255,255,255,0.22)" },
-          ]}
-        />
-        <Text style={[styles.statusText, { color: "rgba(255,255,255,0.35)" }]}>
-          {item.statusText}
-        </Text>
-      </View>
-    );
-  })();
+function PayRow({ item }: { item: PaymentWithDetails }) {
+  const dueDate = new Date(item.due_date);
+  const formattedDate = dueDate.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffTime = dueDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const statusText = item.is_paid
+    ? "PAID"
+    : diffDays < 0
+    ? `${Math.abs(diffDays)}D OVERDUE`
+    : diffDays === 0
+    ? "TODAY"
+    : diffDays === 1
+    ? "TOMORROW"
+    : `${diffDays} DAYS LEFT`;
+
+  const accentColor =
+    CARD_COLORS.find((c) => c.value === item.card_color)?.hex || "#fff";
 
   return (
     <View style={styles.rowCard}>
@@ -318,30 +295,64 @@ function PayRow({ item }: { item: PayItem }) {
 
       <View style={styles.rowLeft}>
         <View style={styles.iconBox}>
-          {item.status === "paid" ? (
-            <Ionicons name="checkmark" size={20} color="rgba(64,255,197,0.9)" />
+          {item.is_paid ? (
+            <Ionicons
+              name="checkmark-circle"
+              size={24}
+              color="rgba(64,255,197,0.9)"
+            />
           ) : (
             <MaterialCommunityIcons
-              name={item.icon}
+              name="cart-outline"
               size={22}
-              color="rgba(255,255,255,0.75)"
+              color={accentColor}
             />
           )}
         </View>
 
-        <View>
-          <Text style={styles.rowTitle}>{item.title}</Text>
-          <Text style={styles.rowMeta}>{item.meta}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {item.description}
+          </Text>
+          <Text style={styles.rowMeta}>
+            {item.store} • {formattedDate}
+          </Text>
         </View>
       </View>
 
       <View style={styles.rowRight}>
-        <Text
-          style={[styles.amount, item.status === "paid" && styles.amountStrike]}
-        >
-          {item.amount}
+        <Text style={[styles.amount, item.is_paid && styles.amountStrike]}>
+          ${item.amount.toFixed(2)}
         </Text>
-        {right}
+
+        <View style={styles.statusRow}>
+          <View
+            style={[
+              styles.statusDot,
+              {
+                backgroundColor: item.is_paid
+                  ? "rgba(64,255,197,0.9)"
+                  : diffDays < 0 || diffDays <= 3
+                  ? "rgba(255,90,90,0.9)"
+                  : "rgba(255,255,255,0.22)",
+              },
+            ]}
+          />
+          <Text
+            style={[
+              styles.statusText,
+              {
+                color: item.is_paid
+                  ? "rgba(64,255,197,0.85)"
+                  : diffDays < 0 || diffDays <= 3
+                  ? "rgba(255,90,90,0.85)"
+                  : "rgba(255,255,255,0.35)",
+              },
+            ]}
+          >
+            {statusText}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -425,25 +436,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  pager: { flexDirection: "row", alignItems: "center", gap: 6 },
-  pagerDotActive: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    backgroundColor: "rgba(47,99,255,0.95)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pagerDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pagerTextActive: { color: "white", fontWeight: "900" },
-  pagerText: { color: "rgba(255,255,255,0.75)", fontWeight: "900" },
 
   activePlansText: {
     color: "rgba(255,255,255,0.30)",
@@ -452,27 +444,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  progressTrack: {
-    width: 88,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    overflow: "hidden",
-  },
-  progressFill: {
-    width: "55%",
-    height: "100%",
-    backgroundColor: "rgba(47,99,255,0.95)",
-  },
-
   filters: {
     marginTop: 16,
     flexDirection: "row",
-    gap: 12,
+    gap: 8,
+    flexWrap: "wrap",
   },
   filterPill: {
     height: 44,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
     alignItems: "center",
@@ -489,14 +469,14 @@ const styles = StyleSheet.create({
   filterText: {
     color: "rgba(255,255,255,0.62)",
     fontWeight: "900",
-    fontSize: 16,
+    fontSize: 14,
   },
 
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 18,
+    marginTop: 22,
     marginBottom: 12,
   },
   sectionTitle: {
@@ -529,13 +509,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
-    backgroundColor: "rgba(255,255,255,0.02)",
+    backgroundColor: "rgba(0,0,0,0)",
   },
-  rowLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
+  rowLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
   iconBox: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
+    width: 50,
+    height: 50,
+    borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -571,6 +551,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  addBtnHighVis: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#C9FF00",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    gap: 6,
+  },
+  addBtnText: {
+    color: "#0B0F10",
+    fontWeight: "900",
+    fontSize: 13,
+  },
   statusDot: { width: 8, height: 8, borderRadius: 99 },
-  statusText: { fontWeight: "900", fontSize: 12, letterSpacing: 1.2 },
+  statusText: { fontWeight: "900", fontSize: 11, letterSpacing: 1.2 },
 });

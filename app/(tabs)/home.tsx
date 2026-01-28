@@ -1,59 +1,57 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "../../context/AuthContext";
 import {
-  FlatList,
-  Image,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-
-type Payment = {
-  id: string;
-  title: string;
-  store: string;
-  amount: string;
-  leftLabel: string;
-  leftVariant: "lime" | "gray";
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-};
-
-const PAYMENTS: Payment[] = [
-  {
-    id: "1",
-    title: "MacBook Pro",
-    store: "Apple Store",
-    amount: "$150.00",
-    leftLabel: "2 DAYS LEFT",
-    leftVariant: "lime",
-    icon: "laptop",
-  },
-  {
-    id: "2",
-    title: "Sportswear",
-    store: "Nordstrom",
-    amount: "$45.00",
-    leftLabel: "3 DAYS LEFT",
-    leftVariant: "lime",
-    icon: "shopping-outline",
-  },
-  {
-    id: "3",
-    title: "Office Chair",
-    store: "West Elm",
-    amount: "$82.50",
-    leftLabel: "6 DAYS LEFT",
-    leftVariant: "gray",
-    icon: "sofa-single-outline",
-  },
-];
+  CARD_COLORS,
+  getActivePurchaseCount,
+  getAllCards,
+  getMonthlyTotal,
+  getUpcomingPayments,
+  type Card,
+  type PaymentWithDetails,
+} from "../../db";
+import { syncPaymentNotifications } from "../../lib/notifications";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [upcoming, setUpcoming] = useState<PaymentWithDetails[]>([]);
+  const [totalMonthly, setTotalMonthly] = useState<number>(0);
+  const [activePlansCount, setActivePlansCount] = useState<number>(0);
+  const [cards, setCards] = useState<Card[]>([]);
+  const { user } = useAuth();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      const fetchData = async () => {
+        try {
+          const [upcomingData, total, count, cardsData] = await Promise.all([
+            getUpcomingPayments(user.id, 7),
+            getMonthlyTotal(user.id),
+            getActivePurchaseCount(user.id),
+            getAllCards(user.id),
+          ]);
+          setUpcoming(upcomingData);
+          setTotalMonthly(total);
+          setActivePlansCount(count);
+          setCards(cardsData);
+        } catch (error) {
+          console.error("Error fetching home data:", error);
+        }
+      };
+      fetchData();
+    }, [user])
+  );
+
+  const totalStr = totalMonthly.toFixed(2);
+  const parts = totalStr.split(".");
+  const intPart = parseInt(parts[0]).toLocaleString();
+  const centsPart = "." + parts[1];
 
   return (
     <View style={styles.root}>
@@ -63,7 +61,6 @@ export default function HomeScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* subtle green glow at bottom like screenshot */}
       <View pointerEvents="none" style={styles.greenGlowWrap}>
         <LinearGradient
           colors={[
@@ -79,30 +76,31 @@ export default function HomeScreen() {
       </View>
 
       <FlatList
-        data={PAYMENTS}
-        keyExtractor={(i) => i.id}
-        contentContainerStyle={styles.listContent}
+        data={upcoming}
+        keyExtractor={(i) => i.id.toString()}
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingTop: Math.max(insets.top, 20),
+            paddingBottom: Math.max(insets.bottom, 20) + 100,
+          },
+        ]}
         ListHeaderComponent={
           <>
-            {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerLeft}>
-                <View style={styles.avatar}>
-                  <Image
-                    source={{
-                      uri: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=60",
-                    }}
-                    style={styles.avatarImg}
-                  />
-                </View>
-
                 <View>
                   <Text style={styles.portfolio}>PORTFOLIO</Text>
-                  <Text style={styles.name}>Alex</Text>
+                  <Text style={styles.name}>{user?.full_name || "User"}</Text>
                 </View>
               </View>
 
-              <Pressable style={styles.iconCircle} onPress={() => {}}>
+              <Pressable
+                style={styles.iconCircle}
+                onPress={() => {
+                  syncPaymentNotifications();
+                }}
+              >
                 <Ionicons
                   name="notifications"
                   size={20}
@@ -111,7 +109,6 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
-            {/* Summary card */}
             <View style={styles.summaryCard}>
               <LinearGradient
                 colors={[
@@ -139,14 +136,16 @@ export default function HomeScreen() {
               <Text style={styles.cardLabel}>TOTAL MONTHLY PAYMENT</Text>
 
               <View style={styles.totalRow}>
-                <Text style={styles.totalBig}>$1,240</Text>
-                <Text style={styles.totalCents}>.00</Text>
+                <Text style={styles.totalBig}>${intPart}</Text>
+                <Text style={styles.totalCents}>{centsPart}</Text>
               </View>
 
               <View style={styles.cardBottomRow}>
                 <View>
                   <Text style={styles.cardSmallLabel}>ACTIVE PLANS</Text>
-                  <Text style={styles.cardSmallValue}>8 Items</Text>
+                  <Text style={styles.cardSmallValue}>
+                    {activePlansCount} Items
+                  </Text>
                 </View>
 
                 <Pressable
@@ -158,22 +157,20 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Next payments header */}
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionTitle}>Next Payments</Text>
                 <Text style={styles.sectionSub}>Upcoming 7 days window</Text>
               </View>
-
-              <Pressable style={styles.sectionIconBtn} onPress={() => {}}>
-                <MaterialCommunityIcons
-                  name="swap-horizontal"
-                  size={18}
-                  color="rgba(255,255,255,0.55)"
-                />
-              </Pressable>
             </View>
           </>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyPayments}>
+            <Text style={styles.emptySub}>
+              No upcoming payments in the next 7 days.
+            </Text>
+          </View>
         }
         renderItem={({ item }) => <PaymentRow item={item} />}
         ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
@@ -181,82 +178,132 @@ export default function HomeScreen() {
           <>
             <View style={{ height: 26 }} />
 
-            {/* Linked cards */}
-            <Text style={styles.sectionTitle}>Linked Cards</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Linked Cards</Text>
+              <Pressable
+                onPress={() => router.push("/cards/new")}
+                style={styles.sectionIconBtn}
+              >
+                <Ionicons name="add" size={20} color={LIME} />
+              </Pressable>
+            </View>
 
             <View style={{ height: 14 }} />
 
-            <View style={styles.cardsRow}>
-              <View style={styles.cardMock}>
-                <LinearGradient
-                  colors={["rgba(255,255,255,0.10)", "rgba(255,255,255,0.03)"]}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                />
-                <Text style={styles.cardMockTop}>VISA INFINITE</Text>
+            <FlatList
+              horizontal
+              data={cards}
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(c) => c.id.toString()}
+              contentContainerStyle={{ gap: 14, paddingRight: 40 }}
+              renderItem={({ item }) => {
+                const config =
+                  CARD_COLORS.find((c) => c.value === item.color) ||
+                  CARD_COLORS[2];
+                return (
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: "/cards/new",
+                        params: { id: item.id },
+                      })
+                    }
+                    style={[
+                      styles.cardMock,
+                      { borderColor: config.hex + "40" },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={[config.hex + "10", "transparent"]}
+                      style={StyleSheet.absoluteFill}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    />
+                    <Text
+                      style={[styles.cardMockTop, { color: config.hex + "80" }]}
+                    >
+                      {item.bank_name.toUpperCase()}
+                    </Text>
 
-                <View style={styles.cardNumberRow}>
-                  <Text style={styles.cardDots}>• • • •</Text>
-                  <Text style={styles.cardLast}>4242</Text>
-                </View>
+                    <View style={styles.cardNumberRow}>
+                      <Text style={styles.cardDots}>• • • •</Text>
+                      <Text style={styles.cardLast}>{item.last4}</Text>
+                    </View>
 
-                <Text style={styles.cardBank}>CHASE SAPPHIRE</Text>
+                    <Text style={styles.cardBank}>{item.name}</Text>
 
-                <View style={styles.aprRow}>
-                  <View style={styles.aprDot} />
-                  <Text style={styles.aprText}>0% APR Active</Text>
-                </View>
-
-                <Pressable
-                  style={styles.editFab}
-                  onPress={() => router.push("/(tabs)/cards/new")}
+                    <View style={styles.aprRow}>
+                      <View
+                        style={[styles.aprDot, { backgroundColor: config.hex }]}
+                      />
+                      <Text style={styles.aprText}>Standard Credit</Text>
+                    </View>
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <View
+                  style={{
+                    width: 260,
+                    height: 170,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
                 >
-                  <Ionicons
-                    name="pencil"
-                    size={16}
-                    color="rgba(255,255,255,0.8)"
-                  />
+                  <Text style={{ color: "rgba(255,255,255,0.2)" }}>
+                    No cards linked
+                  </Text>
+                </View>
+              }
+              ListFooterComponent={
+                <Pressable
+                  onPress={() => router.push("/cards/new")}
+                  style={styles.cardGhost}
+                >
+                  <View style={styles.dashBox} />
+                  <Text style={styles.ghostText}>ADD</Text>
                 </Pressable>
-              </View>
-
-              <View style={styles.cardGhost}>
-                <View style={styles.dashBox} />
-                <Text style={styles.ghostText}>NEW</Text>
-              </View>
-            </View>
+              }
+            />
 
             <View style={{ height: 18 }} />
 
             <Pressable
-              onPress={() => router.push("/(tabs)/cards/new")}
+              onPress={() => router.push("/(tabs)/payments")}
               style={({ pressed }) => [
                 styles.addPurchaseBtn,
                 pressed && { transform: [{ scale: 0.99 }] },
               ]}
             >
               <View style={styles.plusCircle}>
-                <Ionicons name="add" size={18} color="#0B0F10" />
+                <Ionicons name="list" size={18} color="#0B0F10" />
               </View>
-              <Text style={styles.addPurchaseText}>Add Purchase</Text>
+              <Text style={styles.addPurchaseText}>Manage Purchases</Text>
             </Pressable>
 
             <View style={{ height: 24 }} />
           </>
         }
       />
-
-      {/* Small floating action like screenshot */}
-      <Pressable style={styles.floatBtn} onPress={() => {}}>
-        <Ionicons name="stats-chart" size={18} color="rgba(255,255,255,0.9)" />
-      </Pressable>
     </View>
   );
 }
 
-function PaymentRow({ item }: { item: Payment }) {
-  const pillStyle =
-    item.leftVariant === "lime" ? styles.pillLime : styles.pillGray;
+function PaymentRow({ item }: { item: PaymentWithDetails }) {
+  const dueDate = new Date(item.due_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffTime = dueDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const leftLabel =
+    diffDays === 0
+      ? "TODAY"
+      : diffDays === 1
+      ? "TOMORROW"
+      : `${diffDays} DAYS LEFT`;
+  const isUrgent = diffDays <= 3;
 
   return (
     <View style={styles.paymentCard}>
@@ -269,23 +316,32 @@ function PaymentRow({ item }: { item: Payment }) {
 
       <View style={styles.paymentLeft}>
         <View style={styles.paymentIconBox}>
-          <MaterialCommunityIcons
-            name={item.icon}
+          <Ionicons
+            name="cart-outline"
             size={22}
-            color="rgba(255,255,255,0.75)"
+            color={
+              CARD_COLORS.find((c) => c.value === item.card_color)?.hex ||
+              "rgba(255,255,255,0.75)"
+            }
           />
         </View>
 
-        <View>
-          <Text style={styles.paymentTitle}>{item.title}</Text>
-          <Text style={styles.paymentStore}>{item.store}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.paymentTitle} numberOfLines={1}>
+            {item.description}
+          </Text>
+          <Text style={styles.paymentStore}>
+            {item.store} • {item.card_name}
+          </Text>
         </View>
       </View>
 
       <View style={styles.paymentRight}>
-        <Text style={styles.paymentAmount}>{item.amount}</Text>
-        <View style={[styles.pill, pillStyle]}>
-          <Text style={styles.pillText}>{item.leftLabel}</Text>
+        <Text style={styles.paymentAmount}>${item.amount.toFixed(2)}</Text>
+        <View
+          style={[styles.pill, isUrgent ? styles.pillLime : styles.pillGray]}
+        >
+          <Text style={styles.pillText}>{leftLabel}</Text>
         </View>
       </View>
     </View>
@@ -298,9 +354,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#05070A" },
 
   listContent: {
-    paddingTop: Platform.OS === "ios" ? 54 : 22,
     paddingHorizontal: 18,
-    paddingBottom: 110,
   },
 
   greenGlowWrap: {
@@ -359,7 +413,7 @@ const styles = StyleSheet.create({
   },
 
   summaryCard: {
-    height: 170,
+    minHeight: 180,
     borderRadius: 26,
     overflow: "hidden",
     padding: 18,
@@ -512,16 +566,15 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   cardMock: {
-    flex: 1,
+    width: 260,
     height: 170,
     borderRadius: 26,
     overflow: "hidden",
     padding: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.03)",
   },
   cardMockTop: {
-    color: "rgba(255,255,255,0.22)",
     letterSpacing: 3,
     fontSize: 11,
     fontWeight: "900",
@@ -544,10 +597,9 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
   },
   cardBank: {
-    marginTop: 24,
-    color: "rgba(255,255,255,0.18)",
-    letterSpacing: 2,
-    fontSize: 11,
+    marginTop: 18,
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 16,
     fontWeight: "900",
   },
   aprRow: {
@@ -560,12 +612,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 99,
-    backgroundColor: LIME,
   },
   aprText: {
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 14,
+    color: "rgba(255,255,255,0.42)",
+    fontSize: 12,
     fontWeight: "800",
+    marginBottom: 0,
   },
   editFab: {
     position: "absolute",
@@ -582,25 +634,38 @@ const styles = StyleSheet.create({
   },
 
   cardGhost: {
-    width: 110,
+    width: 120,
     height: 170,
     borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    borderStyle: "dashed",
   },
   dashBox: {
     position: "absolute",
-    inset: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     borderRadius: 26,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.12)",
-    borderStyle: "dashed",
   },
   ghostText: {
     color: "rgba(255,255,255,0.18)",
     letterSpacing: 3,
     fontWeight: "900",
+  },
+
+  emptyPayments: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  emptySub: {
+    color: "rgba(255,255,255,0.2)",
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   addPurchaseBtn: {

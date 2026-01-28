@@ -4,13 +4,6 @@ export default function Index() {
   const isLoggedIn = false;
   const onboardingCompleted = false;
 
-  if (!isLoggedIn) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
-  if (!onboardingCompleted) {
-    return <Redirect href="/(onboarding)/notifications" />;
-  }
-
-  return <Redirect href="/(tabs)/home" />;
+  // Always start with splash screen
+  return <Redirect href="/(auth)/splash" />;
 }

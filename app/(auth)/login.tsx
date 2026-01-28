@@ -1,15 +1,21 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
+import { saveSession, validateUser } from "../../db";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -17,10 +23,62 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const { signIn, hasStoredToken, restoreSession } = useAuth();
 
   const canSubmit = useMemo(() => {
-    return email.trim().length > 0 && password.length > 0;
+    return email.trim().includes("@") && password.length >= 6;
   }, [email, password]);
+
+  const handleSignIn = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+
+    try {
+      const user = await validateUser(email, password);
+      if (user) {
+        await saveSession(user.id);
+        signIn(user);
+        // AuthProvider will handle navigation
+      } else {
+        Alert.alert("Error", "Invalid email or password");
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        Alert.alert(
+          "Biometrics Unavailable",
+          "Your device does not support biometrics or none are enrolled."
+        );
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Login with Biometrics",
+        fallbackLabel: "Use Passcode",
+      });
+
+      if (result.success) {
+        await restoreSession();
+      }
+      // If failed or cancelled, do nothing (stay on login)
+    } catch (error) {
+      console.error("[Login] Biometric error:", error);
+      Alert.alert("Error", "Biometric authentication failed.");
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -30,147 +88,177 @@ export default function LoginScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          hitSlop={12}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Ionicons
-            name="chevron-back"
-            size={26}
-            color="rgba(255,255,255,0.75)"
-          />
-        </Pressable>
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable
+              onPress={() => router.back()}
+              style={styles.backBtn}
+              hitSlop={12}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={26}
+                color="rgba(255,255,255,0.75)"
+              />
+            </Pressable>
 
-        <Text style={styles.headerTitle}>SECURE LOGIN</Text>
+            <Text style={styles.headerTitle}>SECURE LOGIN</Text>
 
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View style={styles.content}>
-        {/* App icon */}
-        <View style={styles.appIcon}>
-          <LinearGradient
-            colors={["#3E7BFF", "#2B56FF", "#2C6BFF"]}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.1, y: 0.0 }}
-            end={{ x: 0.9, y: 1 }}
-          />
-          <View style={styles.appIconInner}>
-            <View style={styles.iconCard} />
-            <View style={styles.iconDot} />
+            <View style={{ width: 40 }} />
           </View>
-        </View>
 
-        <Text style={styles.title}>Welcome to Zero</Text>
-        <Text style={styles.subtitle}>
-          Manage your 0% installments and avoid{"\n"}hidden fees effortlessly.
-        </Text>
+          <View style={styles.content}>
+            {/* App icon */}
+            <View style={styles.appIcon}>
+              <LinearGradient
+                colors={["#3E7BFF", "#2B56FF", "#2C6BFF"]}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0.1, y: 0.0 }}
+                end={{ x: 0.9, y: 1 }}
+              />
+              <View style={styles.appIconInner}>
+                <View style={styles.iconCard} />
+                <View style={styles.iconDot} />
+              </View>
+            </View>
 
-        {/* Form */}
-        <View style={{ height: 22 }} />
+            <Text style={styles.title}>Welcome to Zero</Text>
+            <Text style={styles.subtitle}>
+              Manage your 0% installments and avoid{"\n"}hidden fees
+              effortlessly.
+            </Text>
 
-        <Text style={styles.label}>EMAIL ADDRESS</Text>
-        <View style={styles.inputWrap}>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="name@example.com"
-            placeholderTextColor="rgba(255,255,255,0.20)"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-        </View>
+            {/* Form */}
+            <View style={{ height: 22 }} />
 
-        <View style={{ height: 18 }} />
+            <Text style={styles.label}>EMAIL ADDRESS</Text>
+            <View style={styles.inputWrap}>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@example.com"
+                placeholderTextColor="rgba(255,255,255,0.20)"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.input}
+              />
+            </View>
 
-        <View style={styles.passwordRow}>
-          <Text style={styles.label}>PASSWORD</Text>
-          <Pressable onPress={() => {}} hitSlop={10}>
-            <Text style={styles.forgot}>Forgot?</Text>
-          </Pressable>
-        </View>
+            <View style={{ height: 18 }} />
 
-        <View style={styles.inputWrap}>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor="rgba(255,255,255,0.20)"
-            secureTextEntry={secure}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-          <Pressable
-            onPress={() => setSecure((s) => !s)}
-            hitSlop={10}
-            style={styles.eyeBtn}
-          >
-            <Ionicons
-              name={secure ? "eye-outline" : "eye-off-outline"}
-              size={20}
-              color="rgba(255,255,255,0.45)"
-            />
-          </Pressable>
-        </View>
+            <View style={styles.passwordRow}>
+              <Text style={styles.label}>PASSWORD</Text>
+              <Pressable
+                onPress={() => router.push("/(auth)/forgot")}
+                hitSlop={10}
+              >
+                <Text style={styles.forgot}>Forgot?</Text>
+              </Pressable>
+            </View>
 
-        <View style={{ height: 22 }} />
+            <View style={styles.inputWrap}>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
+                placeholderTextColor="rgba(255,255,255,0.20)"
+                secureTextEntry={secure}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.input}
+              />
+              <Pressable
+                onPress={() => setSecure((s) => !s)}
+                hitSlop={10}
+                style={styles.eyeBtn}
+              >
+                <Ionicons
+                  name={secure ? "eye-outline" : "eye-off-outline"}
+                  size={20}
+                  color="rgba(255,255,255,0.45)"
+                />
+              </Pressable>
+            </View>
 
-        <Pressable
-          onPress={() => {}}
-          disabled={!canSubmit}
-          style={({ pressed }) => [
-            styles.signInBtn,
-            !canSubmit && { opacity: 0.55 },
-            pressed && canSubmit && { transform: [{ scale: 0.99 }] },
-          ]}
-        >
-          <Text style={styles.signInText}>Sign In</Text>
-        </Pressable>
+            <View style={{ height: 22 }} />
 
-        {/* Secure access */}
-        <View style={{ height: 26 }} />
+            <Pressable
+              onPress={handleSignIn}
+              disabled={!canSubmit || loading}
+              style={({ pressed }) => [
+                styles.signInBtn,
+                (!canSubmit || loading) && { opacity: 0.55 },
+                pressed &&
+                  canSubmit &&
+                  !loading && { transform: [{ scale: 0.99 }] },
+              ]}
+            >
+              <Text style={styles.signInText}>
+                {loading ? "Signing in..." : "Sign In"}
+              </Text>
+            </Pressable>
 
-        <View style={styles.secureAccessRow}>
-          <View style={styles.line} />
-          <Text style={styles.secureAccessText}>SECURE ACCESS</Text>
-          <View style={styles.line} />
-        </View>
+            {/* Secure access - Only show if we have a stored token */}
+            {hasStoredToken && (
+              <>
+                <View style={{ height: 26 }} />
 
-        <View style={{ height: 16 }} />
+                <View style={styles.secureAccessRow}>
+                  <View style={styles.line} />
+                  <Text style={styles.secureAccessText}>SECURE ACCESS</Text>
+                  <View style={styles.line} />
+                </View>
 
-        <View style={styles.quickRow}>
-          <Pressable style={styles.quickBtn} onPress={() => {}}>
-            <MaterialCommunityIcons
-              name="face-recognition"
-              size={26}
-              color="rgba(255,255,255,0.78)"
-            />
-          </Pressable>
+                <View style={{ height: 16 }} />
 
-          <Pressable style={styles.quickBtn} onPress={() => {}}>
-            <Ionicons
-              name="finger-print"
-              size={26}
-              color="rgba(255,255,255,0.78)"
-            />
-          </Pressable>
-        </View>
+                <View style={styles.quickRow}>
+                  <Pressable
+                    style={styles.quickBtn}
+                    onPress={handleBiometricAuth}
+                  >
+                    <MaterialCommunityIcons
+                      name="face-recognition"
+                      size={26}
+                      color="rgba(255,255,255,0.78)"
+                    />
+                  </Pressable>
 
-        <View style={{ height: 20 }} />
+                  <Pressable
+                    style={styles.quickBtn}
+                    onPress={handleBiometricAuth}
+                  >
+                    <Ionicons
+                      name="finger-print"
+                      size={26}
+                      color="rgba(255,255,255,0.78)"
+                    />
+                  </Pressable>
+                </View>
+              </>
+            )}
 
-        <View style={styles.createRow}>
-          <Text style={styles.createMuted}>New to Zero? </Text>
-          <Pressable onPress={() => router.push("/(auth)/register")}>
-            <Text style={styles.createLink}>Create Account</Text>
-          </Pressable>
-        </View>
-      </View>
+            <View style={{ height: 20 }} />
+
+            <View style={styles.createRow}>
+              <Text style={styles.createMuted}>New to Zero? </Text>
+              <Pressable onPress={() => router.push("/(auth)/register")}>
+                <Text style={styles.createLink}>Create Account</Text>
+              </Pressable>
+            </View>
+            <View style={{ height: 40 }} />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -202,7 +290,6 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
     paddingHorizontal: 22,
     paddingTop: 24,
   },

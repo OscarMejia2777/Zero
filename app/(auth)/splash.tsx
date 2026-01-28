@@ -1,12 +1,23 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 
 export default function SplashScreenZero() {
+  const router = useRouter();
   const spin = useRef(new Animated.Value(0)).current;
   const ring = useRef(new Animated.Value(0)).current;
 
   const [progress, setProgress] = useState(0.32); // ~32% como la imagen
+
+  useEffect(() => {
+    // Navigate to login after 2s
+    const timer = setTimeout(() => {
+      router.replace("/(auth)/login");
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     Animated.loop(
